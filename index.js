@@ -29,6 +29,18 @@ async function run() {
 
     // Collections.
     const userCollection = client.db("restaurantDB").collection("user");
+    const foodCollection = client.db("restaurantDB").collection("foods");
+
+    /**
+     * @FOODS
+     */
+    
+    app.post("/foods", async(req, res) => {
+      const info = req.body;
+      // console.log("POST /foods: ", info);
+      const result = await foodCollection.insertOne(info);
+      res.send(result);
+    })
 
 
 
@@ -39,7 +51,7 @@ async function run() {
     // Saving User info.
     app.post("/user", async(req, res) => {
         const userInfo = req.body;
-        console.log("POST /user :", userInfo);
+        // console.log("POST /user :", userInfo);   
         const result = await userCollection.insertOne(userInfo);
         res.send(result);
     });
