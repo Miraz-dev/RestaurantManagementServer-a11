@@ -40,6 +40,11 @@ async function run() {
       // console.log("POST /foods: ", info);
       const result = await foodCollection.insertOne(info);
       res.send(result);
+    });
+
+    app.get("/foods", async(req, res) => {
+      const result = await foodCollection.find().toArray();
+      res.send(result);
     })
 
 
