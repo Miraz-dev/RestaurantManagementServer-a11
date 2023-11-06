@@ -58,8 +58,32 @@ async function run() {
       const id = req.params.id;
       const result = await foodCollection.findOne({_id: new ObjectId(id)});
       res.send(result);
-    })
+    });
 
+
+    app.put("/foods/:id", async(req, res) => {
+      const info = req.body;
+
+      const id = req.params.id;
+      const filter = {_id: new ObjectId(id)};
+      const options = {upsert: true};
+      const updateDoc = {
+        $set: {
+          foodName: info.foodName,
+          category: info.category, 
+          price: info.price, 
+          description: info.description, 
+          image: info.image, 
+          origin: info.origin, 
+          qty: info.qty, 
+          user_email: info.user_email, 
+          user_name: info.user_name
+        }
+      }
+
+      const result = await foodCollection.updateOne(filter, updateDoc, options);
+      res.send(result);
+    })
 
 
     /**
