@@ -49,7 +49,11 @@ async function run() {
       if(req.query?.email){
         query = { orderedBy: req.query.email };
       }
-      const result = await ordersCollection.find(query).toArray();
+      const options = {
+        sort: {"dishOrdered": -1}
+      };
+
+      const result = await ordersCollection.find(query, options).toArray();
       res.send(result);
     });
 
@@ -58,6 +62,28 @@ async function run() {
       const query = {_id: new ObjectId(id)};
       const result = await ordersCollection.deleteOne(query);
       res.send(result);
+    });
+
+
+    app.get("/top-selling-items", async(req, res) => {
+      const result = await ordersCollection.aggregate([
+        {
+          $group: {
+            _id: "$foodUID",
+            totalOrders: {$sum: "$dishOrdered"}
+          }
+        },
+        {
+          $sort: {totalOrders: -1}
+        },
+        {
+          $limit: 6
+        }
+      ]).toArray();
+
+      // console.log("From top-selling route: ", result);
+      res.send(result);
+
     })
 
 
