@@ -30,6 +30,30 @@ async function run() {
     // Collections.
     const userCollection = client.db("restaurantDB").collection("user");
     const foodCollection = client.db("restaurantDB").collection("foods");
+    const ordersCollection = client.db("restaurantDB").collection("orders");
+
+    /**
+     * @ORDER_COLLECTION
+     */
+
+    app.post("/orders", async(req, res) => {
+      const info = req.body;
+      const result = await ordersCollection.insertOne(info);
+      res.send(result);
+    });
+
+
+    app.get("/orders", async(req, res) => {
+      // console.log(req.query.email);
+      let query = {};
+      if(req.query?.email){
+        query = { orderedBy: req.query.email };
+      }
+      const result = await ordersCollection.find(query).toArray();
+      res.send(result);
+    })
+
+
 
     /**
      * @FOODS
@@ -83,7 +107,29 @@ async function run() {
 
       const result = await foodCollection.updateOne(filter, updateDoc, options);
       res.send(result);
-    })
+    });
+
+
+    app.patch('/foods/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedInfo = req.body;
+      console.log(updatedInfo);
+      const updateDoc = {
+          $set: {
+              qty: updatedInfo.quantity
+          },
+      };
+      const result = await foodCollection.updateOne(filter, updateDoc);
+      res.send(result);
+  })
+
+
+    // For Pagination
+    app.get("/allfoods", async(req, res) => {
+      const result = await foodCollection.find().toArray();
+      res.send(result);
+    });
 
 
     /**
