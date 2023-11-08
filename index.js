@@ -9,7 +9,10 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 app.use(cors({
-  origin: ['http://localhost:5173'],
+  origin: [
+    'https://restaurant-management-d0c16.web.app',
+    'https://restaurant-management-d0c16.firebaseapp.com'
+  ],
   credentials: true
 }));
 app.use(express.json());
@@ -55,7 +58,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     // Collections.
     const userCollection = client.db("restaurantDB").collection("user");
@@ -72,8 +75,8 @@ async function run() {
 
       res.cookie("token", token, {
           httpOnly: true,
-          secure: true,
-          sameSite: "none"
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict'
       })
          .send({success: true});
     });
@@ -95,6 +98,7 @@ async function run() {
       // console.log(req.query.email);
       // console.log("Cookie: ", req.cookies.token);
 
+      // Problem may be here?
       if(req.query?.email !== req.user.email){
         return res.status(403).send({message: "Forbidden Acccess"});
       }
@@ -119,6 +123,7 @@ async function run() {
     });
 
 
+    
     app.get("/top-selling-items", async(req, res) => {
       const result = await ordersCollection.aggregate([
         {
@@ -214,9 +219,26 @@ async function run() {
 
     // For Pagination
     app.get("/allfoods", async(req, res) => {
-      const result = await foodCollection.find().toArray();
-      res.send(result);
+      // const result = await foodCollection.find().toArray();
+      // res.send(result);
+
+      console.log("Query GET /produtcts: ",req.query);
+        const page = parseInt(req.query.page);
+        const size = parseInt(req.query.size);
+
+
+        const result = await foodCollection.find()
+        .skip(page * size)
+        .limit(size)
+        .toArray();
+        res.send(result);
+
     });
+
+    app.get("/productsCount", async(req, res) => {
+      const count = await foodCollection.estimatedDocumentCount();
+      res.send({count});
+    })
 
 
     /**
@@ -246,7 +268,7 @@ async function run() {
 
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
+    await client.db("admin").command({ ping: 1 }); //delete this?
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
