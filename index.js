@@ -1,48 +1,46 @@
-const express = require('express');
+const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
-const jwt = require('jsonwebtoken');
-const cookieParser = require('cookie-parser');
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 const app = express();
 const port = process.env.PORT || 5000;
 
-app.use(cors({
-  origin: [
-    'https://restaurant-management-d0c16.web.app',
-    'https://restaurant-management-d0c16.firebaseapp.com'
-  ],
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: [
+      "https://restaurant-management-d0c16.web.app",
+      "https://restaurant-management-d0c16.firebaseapp.com",
+    ],
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(cookieParser());
 
-
-
 // Custom Middleware
 const logger = (req, res, next) => {
-  console.log("Log Info: ",req.method, req.url);
+  console.log("Log Info: ", req.method, req.url);
   next();
 };
 
 const verifyToken = (req, res, next) => {
   const token = req?.cookies?.token;
   console.log("Token in the middleware: ", token);
-  if(!token){
-      return res.status(401).send({message: "Unathorized"})
+  if (!token) {
+    return res.status(401).send({ message: "Unathorized" });
   }
-  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded)=> {
-      if(err){
-          return res.status(401).send({message: "Unathorized"});
-      }
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ message: "Unathorized" });
+    }
 
-      req.user = decoded;
-      next();
-  })
-}
-
-
+    req.user = decoded;
+    next();
+  });
+};
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.uxpun0e.mongodb.net/?retryWrites=true&w=majority`;
 
@@ -52,7 +50,7 @@ const client = new MongoClient(uri, {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  }
+  },
 });
 
 async function run() {
@@ -65,104 +63,117 @@ async function run() {
     const foodCollection = client.db("restaurantDB").collection("foods");
     const ordersCollection = client.db("restaurantDB").collection("orders");
 
-
     // Auth related API
-    app.post("/jwt", logger, async(req, res) => {
+    app.post("/jwt", logger, async (req, res) => {
       const user = req.body;
       console.log("User for token: ", user);
 
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn: "1h"});
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1h",
+      });
 
-      res.cookie("token", token, {
+      res
+        .cookie("token", token, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict'
-      })
-         .send({success: true});
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        })
+        .send({ success: true });
     });
-
-
 
     /**
      * @ORDER_COLLECTION
      */
 
-    app.post("/orders", async(req, res) => {
+    app.post("/orders", async (req, res) => {
       const info = req.body;
       const result = await ordersCollection.insertOne(info);
       res.send(result);
     });
 
-
-    app.get("/orders", verifyToken, async(req, res) => {
+    app.get("/orders", verifyToken, async (req, res) => {
       // console.log(req.query.email);
       // console.log("Cookie: ", req.cookies.token);
 
       // Problem may be here?
-      if(req.query?.email !== req.user.email){
-        return res.status(403).send({message: "Forbidden Acccess"});
+      if (req.query?.email !== req.user.email) {
+        return res.status(403).send({ message: "Forbidden Acccess" });
       }
 
       let query = {};
-      if(req.query?.email){
+      if (req.query?.email) {
         query = { orderedBy: req.query.email };
       }
       const options = {
-        sort: {"dishOrdered": -1}
+        sort: { dishOrdered: -1 },
       };
 
       const result = await ordersCollection.find(query, options).toArray();
       res.send(result);
     });
 
-    app.delete("/orders/:id", async(req, res) => {
+    app.delete("/orders/:id", async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)};
+      const query = { _id: new ObjectId(id) };
       const result = await ordersCollection.deleteOne(query);
       res.send(result);
     });
 
+    app.get("/top-selling-items", async (req, res) => {
+      // _id: new ObjectId (654a44d12dd1311978813220)
+      // foodName: "Mozzarella Sticks"
+      // foodPrice: 480
+      // dishOrdered: 4
+      // madeBy: "Miraz"
+      // orderedBy: "miraz.officialx@gmail.com"
+      // image: "https://i.ibb.co/52FHtC6/23596-fried-mozzarella-cheese-sticks-DDMFS-4x…"
+      // description: "Deep-fried sticks of mozzarella cheese coated in a seasoned breadcrumb…"
+      // category: "Appetizers"
+      // origin: "China"
+      // addedTime: "Nov 7th 23"
+      // foodUID: "6548e322b02f8c692bdf9260"
 
-    
-    app.get("/top-selling-items", async(req, res) => {
-      const result = await ordersCollection.aggregate([
-        {
-          $group: {
-            _id: "$foodUID",
-            totalOrders: {$sum: "$dishOrdered"}
-          }
-        },
-        {
-          $sort: {totalOrders: -1}
-        },
-        {
-          $limit: 6
-        }
-      ]).toArray();
+      // Here, there are different foodUID and diffreent users orderdered
+      // diff amount. The $group collects the same foodUID and calculates
+      // the sum of dishOrdered. Then sort them in descending order and eventually send
+      // the top 6 result...
+      const result = await ordersCollection
+        .aggregate([
+          {
+            $group: {
+              _id: "$foodUID",
+              totalOrders: { $sum: "$dishOrdered" },
+            },
+          },
+          {
+            $sort: { totalOrders: -1 },
+          },
+          {
+            $limit: 6,
+          },
+        ])
+        .toArray();
 
       // console.log("From top-selling route: ", result);
       res.send(result);
-
-    })
-
-
+    });
 
     /**
      * @FOODS
      */
-    
-    app.post("/foods", async(req, res) => {
+
+    app.post("/foods", async (req, res) => {
       const info = req.body;
       // console.log("POST /foods: ", info);
       const result = await foodCollection.insertOne(info);
       res.send(result);
     });
 
-    app.get("/foods", async(req, res) => {
+    app.get("/foods", async (req, res) => {
       console.log(req.query.email);
       let query = {};
-      if(req.query?.email){
-        query = {user_email: req.query.email}
+      if (req.query?.email) {
+        query = { user_email: req.query.email };
       }
       console.log(query);
       const result = await foodCollection.find(query).toArray();
@@ -170,106 +181,101 @@ async function run() {
     });
 
     // Get a single item based on ID
-    app.get("/foods/:id", async(req, res) => {
+    app.get("/foods/:id", async (req, res) => {
       const id = req.params.id;
-      const result = await foodCollection.findOne({_id: new ObjectId(id)});
+      const result = await foodCollection.findOne({ _id: new ObjectId(id) });
       res.send(result);
     });
 
-
-    app.put("/foods/:id", async(req, res) => {
+    app.put("/foods/:id", async (req, res) => {
       const info = req.body;
 
       const id = req.params.id;
-      const filter = {_id: new ObjectId(id)};
-      const options = {upsert: true};
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
       const updateDoc = {
         $set: {
           foodName: info.foodName,
-          category: info.category, 
-          price: info.price, 
-          description: info.description, 
-          image: info.image, 
-          origin: info.origin, 
-          qty: info.qty, 
-          user_email: info.user_email, 
-          user_name: info.user_name
-        }
-      }
+          category: info.category,
+          price: info.price,
+          description: info.description,
+          image: info.image,
+          origin: info.origin,
+          qty: info.qty,
+          user_email: info.user_email,
+          user_name: info.user_name,
+        },
+      };
 
       const result = await foodCollection.updateOne(filter, updateDoc, options);
       res.send(result);
     });
 
-
-    app.patch('/foods/:id', async (req, res) => {
+    app.patch("/foods/:id", async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updatedInfo = req.body;
       console.log(updatedInfo);
       const updateDoc = {
-          $set: {
-              qty: updatedInfo.quantity
-          },
+        $set: {
+          qty: updatedInfo.quantity,
+        },
       };
       const result = await foodCollection.updateOne(filter, updateDoc);
       res.send(result);
-  })
-
+    });
 
     // For Pagination
-    app.get("/allfoods", async(req, res) => {
+    app.get("/allfoods", async (req, res) => {
       // const result = await foodCollection.find().toArray();
       // res.send(result);
 
-      console.log("Query GET /produtcts: ",req.query);
-        const page = parseInt(req.query.page);
-        const size = parseInt(req.query.size);
+      console.log("Query GET /produtcts: ", req.query);
+      const page = parseInt(req.query.page);
+      const size = parseInt(req.query.size);
 
-
-        const result = await foodCollection.find()
+      const result = await foodCollection
+        .find()
         .skip(page * size)
         .limit(size)
         .toArray();
-        res.send(result);
-
+      res.send(result);
     });
 
-    app.get("/productsCount", async(req, res) => {
+    app.get("/productsCount", async (req, res) => {
       const count = await foodCollection.estimatedDocumentCount();
-      res.send({count});
-    })
-
+      res.send({ count });
+    });
 
     /**
-    * @USER_BELOW
-    */
+     * @USER_BELOW
+     */
 
     // Saving User info.
-    app.post("/user", async(req, res) => {
-        const userInfo = req.body;
-        // console.log("POST /user :", userInfo);   
-        const result = await userCollection.insertOne(userInfo);
-        res.send(result);
+    app.post("/user", async (req, res) => {
+      const userInfo = req.body;
+      // console.log("POST /user :", userInfo);
+      const result = await userCollection.insertOne(userInfo);
+      res.send(result);
     });
 
     // Getting the user info.
-    app.get("/user", async(req, res) => {
-        const result = await userCollection.find().toArray();
-        res.send(result);
-    })
+    app.get("/user", async (req, res) => {
+      const result = await userCollection.find().toArray();
+      res.send(result);
+    });
 
-
-    app.post("/logout", async(req, res) => {
+    app.post("/logout", async (req, res) => {
       const user = req.body;
       console.log("Loggin out: ", user);
-      res.clearCookie("token", {maxAge: 0}).send({success: true});
-    })
-
+      res.clearCookie("token", { maxAge: 0 }).send({ success: true });
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 }); //delete this?
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    console.log(
+      "Pinged your deployment. You successfully connected to MongoDB!"
+    );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
@@ -277,13 +283,10 @@ async function run() {
 }
 run().catch(console.dir);
 
-
-
-app.get("/", (req, res) =>{
-    res.send("Restaurant Management Server is running.");
-})
-
+app.get("/", (req, res) => {
+  res.send("Restaurant Management Server is running.");
+});
 
 app.listen(port, () => {
-    console.log(`Server is running at port: ${port}`);
-})
+  console.log(`Server is running at port: ${port}`);
+});
